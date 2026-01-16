@@ -4,6 +4,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+docs/
+
 # Package manager lockfiles (optional - uncomment to track versions)
 # package-lock.json
 # yarn.lock
