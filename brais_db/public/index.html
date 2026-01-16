@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Custom RDBMS Task Manager</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1>RDBMS Task Manager</h1>
+
+      <!-- CREATE Section -->
+      <div class="crud-section">
+        <div class="section-title">Create Task</div>
+        <div class="form-group">
+          <input type="text" id="taskTitle" placeholder="Task Name" />
+          <input type="number" id="taskId" placeholder="Task ID" />
+          <select id="categoryId">
+            <option value="1">Work</option>
+            <option value="2">Personal</option>
+            <option value="3">Urgent</option>
+          </select>
+          <button class="btn-create" onclick="addTask()">Add Task</button>
+        </div>
+        <div id="createStatus"></div>
+      </div>
+
+      <!-- READ Section -->
+      <div class="crud-section">
+        <div class="section-title">Read Tasks</div>
+        <button class="btn-create" onclick="loadTasks()">Refresh Tasks</button>
+        <div id="taskList" class="task-list"></div>
+      </div>
+
+      <!-- UPDATE Section -->
+      <div class="crud-section">
+        <div class="section-title">Update Task</div>
+        <div class="form-group">
+          <input
+            type="number"
+            id="updateTaskId"
+            placeholder="Task ID to Update"
+          />
+          <input type="text" id="updateTaskTitle" placeholder="New Task Name" />
+          <button class="btn-update" onclick="updateTask()">Update Task</button>
+        </div>
+        <div id="updateStatus"></div>
+      </div>
+
+      <!-- DELETE Section -->
+      <div class="crud-section">
+        <div class="section-title">Delete Task</div>
+        <div class="form-group">
+          <input
+            type="number"
+            id="deleteTaskId"
+            placeholder="Task ID to Delete"
+          />
+          <button class="btn-delete" onclick="deleteTask()">Delete Task</button>
+        </div>
+        <div id="deleteStatus"></div>
+      </div>
+    </div>
+
+    <script>
+      async function loadTasks() {
+        try {
+          const res = await fetch("/api/tasks");
+          const tasks = await res.json();
+          const list = document.getElementById("taskList");
+
+          if (tasks.length === 0) {
+            list.innerHTML =
+              '<div class="empty-message">No tasks found. Create one to get started!</div>';
+            return;
+          }
+
+          list.innerHTML = tasks
+            .map(
+              (t) => `
+          <div class="task-item">
+            <div class="task-info">
+              <div class="task-title">${t.title}</div>
+              <div class="task-meta">ID: ${t.id} | Category: ${t.category_id}</div>
+            </div>
+            <div class="task-actions">
+              <button class="btn-delete" onclick="deleteTaskById(${t.id})">Delete</button>
+            </div>
+          </div>
+        `
+            )
+            .join("");
+        } catch (err) {
+          showStatus("createStatus", "Error loading tasks", "error");
+        }
+      }
+
+      async function addTask() {
+        const title = document.getElementById("taskTitle").value;
+        const id = document.getElementById("taskId").value || Date.now();
+        const categoryId = document.getElementById("categoryId").value;
+
+        if (!title.trim()) {
+          showStatus("createStatus", "Please enter a task name", "error");
+          return;
+        }
+
+        try {
+          const res = await fetch("/api/tasks", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: parseInt(id),
+              title: title,
+              category_id: parseInt(categoryId),
+            }),
+          });
+
+          if (res.ok) {
+            showStatus(
+              "createStatus",
+              "✓ Task created successfully!",
+              "success"
+            );
+            document.getElementById("taskTitle").value = "";
+            document.getElementById("taskId").value = "";
+            loadTasks();
+          } else {
+            showStatus("createStatus", "Error creating task", "error");
+          }
+        } catch (err) {
+          showStatus("createStatus", "Error: " + err.message, "error");
+        }
+      }
+
+      async function updateTask() {
+        const id = document.getElementById("updateTaskId").value;
+        const title = document.getElementById("updateTaskTitle").value;
+
+        if (!id || !title.trim()) {
+          showStatus(
+            "updateStatus",
+            "Please enter both ID and new title",
+            "error"
+          );
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/tasks/${id}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ title: title }),
+          });
+
+          if (res.ok) {
+            showStatus(
+              "updateStatus",
+              "✓ Task updated successfully!",
+              "success"
+            );
+            document.getElementById("updateTaskId").value = "";
+            document.getElementById("updateTaskTitle").value = "";
+            loadTasks();
+          } else {
+            showStatus(
+              "updateStatus",
+              "Task not found or error updating",
+              "error"
+            );
+          }
+        } catch (err) {
+          showStatus("updateStatus", "Error: " + err.message, "error");
+        }
+      }
+
+      async function deleteTask() {
+        const id = document.getElementById("deleteTaskId").value;
+
+        if (!id) {
+          showStatus("deleteStatus", "Please enter a task ID", "error");
+          return;
+        }
+
+        try {
+          const res = await fetch(`/api/tasks/${id}`, {
+            method: "DELETE",
+          });
+
+          if (res.ok) {
+            showStatus(
+              "deleteStatus",
+              "✓ Task deleted successfully!",
+              "success"
+            );
+            document.getElementById("deleteTaskId").value = "";
+            loadTasks();
+          } else {
+            showStatus("deleteStatus", "Task not found", "error");
+          }
+        } catch (err) {
+          showStatus("deleteStatus", "Error: " + err.message, "error");
+        }
+      }
+
+      async function deleteTaskById(id) {
+        try {
+          const res = await fetch(`/api/tasks/${id}`, {
+            method: "DELETE",
+          });
+
+          if (res.ok) {
+            loadTasks();
+          }
+        } catch (err) {
+          console.error("Error deleting task:", err);
+        }
+      }
+
+      function showStatus(elementId, message, type) {
+        const el = document.getElementById(elementId);
+        el.className = `status ${type}`;
+        el.textContent = message;
+        setTimeout(() => {
+          el.textContent = "";
+          el.className = "";
+        }, 3000);
+      }
+
+      loadTasks(); // Initial load
+    </script>
+  </body>
+</html>
